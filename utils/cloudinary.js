@@ -1,4 +1,5 @@
 const cloudinary = require('cloudinary').v2;
+const streamifier = require('streamifier');
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -7,20 +8,25 @@ cloudinary.config({
 });
 
 const uploadToCloudinary = async (file) => {
-  try {
-    const result = await cloudinary.uploader.upload(file.path, {
-      folder: 'events',
-      crop: 'scale'
-    });
-    console.log('result',result);
-    return {
-      public_id: result.public_id,
-      url: result.secure_url
-    };
-  } catch (error) {
-    cosnole.log('error',error);
-    throw new Error('Error uploading image to Cloudinary');
-  }
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder: 'events',
+        crop: 'scale'
+      },
+      (error, result) => {
+        if (result) {
+          resolve({
+            public_id: result.public_id,
+            url: result.secure_url
+          });
+        } else {
+          reject(error);
+        }
+      }
+    );
+    streamifier.createReadStream(file.buffer).pipe(stream);
+  });
 };
 
 const deleteFromCloudinary = async (public_id) => {
